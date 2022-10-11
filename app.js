@@ -3,6 +3,8 @@ const express = require("express");
 const path = require("path");
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
+const session = require("express-session");
+const FileStore = require("session-file-store")(session);
 
 const indexRouter = require("./routes/index");
 const usersRouter = require("./routes/users");
@@ -18,10 +20,10 @@ mongoose.Promise = global.Promise;
 
 const connect = mongoose.connect(url, {
   // useMongoClient: true,
-  // useCreateIndex: true,
-  // useFindAndModify: false,
-  // useNewUrlParser: true,
-  // useUnifiedTopology: true,
+  useCreateIndex: true,
+  useFindAndModify: false,
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
 });
 
 connect.then(
@@ -38,11 +40,40 @@ app.set("view engine", "jade");
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, "public")));
+// app.use(cookieParser("ANYSTRING2134324253431231"));
+
+app.use(
+  session({
+    name: "session-id",
+    secret: "somesecretstring",
+    saveUninitialized: false,
+    resave: false,
+    store: new FileStore(),
+  })
+);
+
+function auth(req, res, next) {
+  if (!req.session.user) {
+    const err = new Error("You are not authenticated!");
+    err.status = 401;
+    return next(err);
+  } else {
+    if (req.session.user === "authenticated") {
+      return next();
+    } else {
+      const err = new Error("You are not authenticated!");
+      err.status = 401;
+      return next(err);
+    }
+  }
+}
 
 app.use("/", indexRouter);
 app.use("/users", usersRouter);
+
+app.use(auth);
+app.use(express.static(path.join(__dirname, "public")));
+
 app.use("/campsites", campsiteRouter);
 app.use("/promotions", promotionRouter);
 app.use("/partners", partnerRouter);
